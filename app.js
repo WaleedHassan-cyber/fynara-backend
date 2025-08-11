@@ -7,7 +7,9 @@ const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 
 const User = require("./models/User.js"); // Import the User model
+const Customer = require("./models/Customer.js"); // Import the Customer model
 const Product = require("./models/Product.js");
+const Order = require("./models/Orders.js"); // Import the Order model
 const upload = require("./config/upload.js");
 const cloudinary = require("./config/cloudinary.js");
 const bcrypt = require("bcrypt");
@@ -38,6 +40,7 @@ mongoose
     console.error("MongoDB connection error:", err);
   });
 
+//Register route for Owner
 if (process.env.NODE_ENV === "production") {
   app.post("/api/register", async (req, res) => {
     const { username, password, email } = req.body;
@@ -63,7 +66,7 @@ if (process.env.NODE_ENV === "production") {
     }
   });
 }
-
+//Login route for owner
 app.post("/api/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -121,6 +124,92 @@ app.post("/api/login", async (req, res, next) => {
   }
 });
 
+//register route for Customer
+app.post("/api/customer/register", async (req, res) => {
+  const { username, password, email, address, phone } = req.body;
+  try {
+    if (!username || !password || !email || !address || !phone) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Hash the password properly
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new Customer({
+      username,
+      email,
+      password: hashedPassword,
+      address,
+      phone,
+    });
+
+    await newUser.save(); // Await the save operation too
+    res.status(200).json({ message: "User Registered Successfully" });
+  } catch (error) {
+    console.error("Error registering user:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+//Login route for Customer
+app.post("/api/customer/login", async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      res.status(400).send("Plz Enter all required feilds");
+    } else {
+      const user = await Customer.findOne({ email });
+      if (!user) {
+        res.status(400).send("Email or Password incorrect");
+      } else {
+        const validateUser = await bcrypt.compare(password, user.password);
+        if (!validateUser) {
+          res.status(400).send("Email or Password incorrect");
+        } else {
+          const payload = {
+            userId: user.id,
+            email: user.email,
+          };
+          const JWT_SECRET_KEY =
+            process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
+          jwt.sign(
+            payload,
+            JWT_SECRET_KEY,
+            { expiresIn: 84600 },
+            async (err, token) => {
+              await Customer.updateOne(
+                { _id: user.id },
+                {
+                  $set: { token },
+                }
+              );
+              user.save();
+              // Set cookie
+              res.cookie("authToken", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+                sameSite: "Strict",
+                maxAge: 24 * 60 * 60 * 1000, // 1 day
+              });
+              return res.status(200).json({
+                user: {
+                  id: user._id,
+                  username: user.username,
+                  email: user.email,
+                  address: user.address,
+                  phone: user.phone,
+                },
+                token: token,
+              });
+            }
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.log("Erorr", error);
+  }
+});
+
 // Example: /api/check-auth
 app.get("/api/check-auth", (req, res) => {
   const token = req.cookies.authToken;
@@ -141,7 +230,8 @@ app.get("/api/check-auth", (req, res) => {
   }
 });
 
-app.post('/api/create', upload.array('images', 4), async (req, res) => {
+//create products
+app.post("/api/create", upload.array("images", 4), async (req, res) => {
   try {
     console.log("FILES RECEIVED:", req.files);
     console.log("BODY RECEIVED:", req.body);
@@ -149,7 +239,9 @@ app.post('/api/create', upload.array('images', 4), async (req, res) => {
     const { productName, type, label, desc, price } = req.body;
 
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: "No images uploaded" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No images uploaded" });
     }
 
     const images = req.files.map((file) => ({
@@ -171,10 +263,10 @@ app.post('/api/create', upload.array('images', 4), async (req, res) => {
     res.status(201).json({ success: true, product });
   } catch (err) {
     console.error("UPLOAD ERROR:", err); // 👈 proper logging
-    res.status(500).json({ success: false, message: 'Server Error' });
+    res.status(500).json({ success: false, message: "Server Error" });
   }
 });
-
+//get products
 app.get("/api/products", async (req, res) => {
   try {
     const products = await Product.find().lean();
@@ -186,6 +278,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
+//Update products
 app.post("/api/update-products", async (req, res) => {
   try {
     const { products } = req.body;
@@ -230,8 +323,7 @@ app.post("/api/update-products", async (req, res) => {
   }
 });
 
-
-
+//delete products
 app.delete("/api/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -250,12 +342,224 @@ app.delete("/api/products/:id", async (req, res) => {
     // Delete product from DB
     await product.deleteOne();
 
-    res.status(200).json({ message: "Product and images deleted successfully." });
+    res
+      .status(200)
+      .json({ message: "Product and images deleted successfully." });
   } catch (error) {
     console.error("Delete error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+//post customer Orders✅
+app.post("/api/orders/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { products } = req.body;
+
+    if (!userId || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: "Invalid order data" });
+    }
+
+    // Validate each product item
+    for (const item of products) {
+      if (!item.product || !item.quantity || item.quantity < 1) {
+        return res.status(400).json({
+          message: "Each product must have a valid product ID and quantity",
+        });
+      }
+    }
+
+    // Fetch product documents from DB
+    const productIds = products.map((item) => item.product);
+    const productDocs = await Product.find({ _id: { $in: productIds } });
+
+    if (productDocs.length !== productIds.length) {
+      return res
+        .status(400)
+        .json({ message: "One or more products not found" });
+    }
+
+    // Convert productDocs to a Map for efficient lookup
+    const productMap = new Map(productDocs.map((p) => [p._id.toString(), p]));
+
+    let totalAmount = 0;
+
+    for (const item of products) {
+      const prod = productMap.get(item.product);
+      if (!prod) {
+        return res
+          .status(400)
+          .json({ message: `Product not found: ${item.product}` });
+      }
+
+      totalAmount += prod.price * item.quantity;
+    }
+
+    // Create new order
+    const newOrder = new Order({
+      user: userId,
+      products,
+      totalAmount,
+      status: "Pending",
+    });
+
+    await newOrder.save();
+
+    // Re-fetch the order with populated product details
+    const populatedOrder = await Order.findById(newOrder._id)
+      .populate("products.product") // make sure schema has ref
+      .populate("user"); // optional: populate user info
+
+    res
+      .status(201)
+      .json({ message: "Order created successfully", order: populatedOrder });
+  } catch (error) {
+    console.error("Error creating order:", error.stack);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+
+//fetch orders for a specific user✅
+app.get("/api/orders/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Pagination parameters (optional, but recommended for large data)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Query orders for user with projection and lean for better performance
+    const orders = await Order.find({ user: userId })
+      .select("status totalAmount createdAt products") // projection: only needed fields
+      .populate({
+        path: "products.product",
+        select: "productName price images", // only needed product fields
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(); // returns plain JS objects instead of Mongoose documents
+
+    // Format response to include quantity along with product details
+    const formattedOrders = orders.map((order) => ({
+      _id: order._id,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      createdAt: order.createdAt,
+      products: order.products.map((item) => ({
+        productId: item.product._id,
+        productName: item.product.productName,
+        price: item.product.price,
+        images: item.product.images,
+        quantity: item.quantity,
+      })),
+    }));
+
+    res.status(200).json({
+      page,
+      limit,
+      orders: formattedOrders,
+    });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// All orders of all users✅
+app.get("/api/orders", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    console.log("Fetching all orders with pagination:", {
+      page,
+      limit,
+      skip,
+    });
+    // Total orders count
+    const totalOrders = await Order.countDocuments();
+
+    // Orders fetch karna with pagination
+    const orders = await Order.find()
+      .select("user products totalAmount status createdAt")
+      .populate({
+        path: "user",
+        select: "username email",
+      })
+      .populate({
+        path: "products.product",
+        select: "productName price images",
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Format orders for cleaner response
+    const formattedOrders = orders.map((order) => ({
+      _id: order._id,
+      user: order.user
+        ? {
+            _id: order.user._id,
+            username: order.user.username,
+            email: order.user.email,
+          }
+        : null,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      createdAt: order.createdAt,
+      products: order.products.map((item) => ({
+        productId: item.product._id,
+        productName: item.product.productName,
+        price: item.product.price,
+        images: item.product.images[0]?.url || "", // Assuming images is an array and we want the first image URL
+        quantity: item.quantity,
+      })),
+    }));
+    // console.log(JSON.stringify(formattedOrders, null, 2));
+    // console.log("Total orders fetched:", formattedOrders);
+    res.status(200).json({
+      totalOrders, // total count of orders
+      totalPages: Math.ceil(totalOrders / limit), // total pages
+      page,
+      limit,
+      orders: formattedOrders,
+    });
+  } catch (error) {
+    console.error("Error fetching all orders:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/api/update-status/:orderId", async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  if (!orderId) return res.status(400).json({ message: "Order ID is required." });
+  if (!status) return res.status(400).json({ message: "Status is required." });
+
+  try {
+    const updatedOrder = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+
+    if (!updatedOrder) 
+      return res.status(404).json({ message: "Order not found." });
+
+    return res.status(200).json({
+      message: "Order status updated successfully.",
+      order: updatedOrder,
+    });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
