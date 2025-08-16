@@ -14,6 +14,7 @@ const upload = require("./config/upload.js");
 const cloudinary = require("./config/cloudinary.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const Target = require("./models/Target.js");
 
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
@@ -540,13 +541,18 @@ app.post("/api/update-status/:orderId", async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
 
-  if (!orderId) return res.status(400).json({ message: "Order ID is required." });
+  if (!orderId)
+    return res.status(400).json({ message: "Order ID is required." });
   if (!status) return res.status(400).json({ message: "Status is required." });
 
   try {
-    const updatedOrder = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
 
-    if (!updatedOrder) 
+    if (!updatedOrder)
       return res.status(404).json({ message: "Order not found." });
 
     return res.status(200).json({
@@ -559,6 +565,71 @@ app.post("/api/update-status/:orderId", async (req, res) => {
   }
 });
 
+app.post("/api/delete-order/:orderId", async (req, res) => {
+  const { orderId } = req.params;
+
+  if (!orderId)
+    return res.status(400).json({ message: "Order ID is required." });
+
+  try {
+    const deletedOrder = await Order.findByIdAndDelete(orderId);
+
+    if (!deletedOrder)
+      return res.status(404).json({ message: "Order not found." });
+
+    return res.status(200).json({
+      message: "Order deleted successfully.",
+      order: deletedOrder,
+    });
+  } catch (error) {
+    console.error("Error deleting order:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.get("/api/get-total-documents", async (req, res) => {
+  try {
+    const totalProducts = await Product.countDocuments();
+    const totalOrders = await Order.countDocuments();
+    const totalCustomers = await Customer.countDocuments();
+
+    console.log("Total Products:", totalProducts);
+    console.log("Total Orders:", totalOrders);
+    console.log("Total Customers:", totalCustomers);
+    res.status(200).json({
+      totalProducts,
+      totalOrders,
+      totalCustomers,
+    });
+  } catch (error) {
+    console.error("Error fetching total documents:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/api/set-target", async (req, res) => {
+  const { amount, endDate, startDate } = req.body;
+  try {
+    
+    // Validate required fields
+    if (!amount || !endDate) {
+      return res.status(400).json({ message: "Amount and endDate are required." });
+    }
+
+    const target = new Target({
+      amount,
+      endDate,
+      startDate: startDate || Date.now() // Use startDate from body or default to now
+    });
+
+    await target.save();
+    res.status(201).json({ success: true, target });
+  
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
