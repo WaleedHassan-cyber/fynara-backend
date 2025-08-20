@@ -5,6 +5,7 @@ const app = express();
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
+const cron = require("node-cron");
 
 const User = require("./models/User.js"); // Import the User model
 const Customer = require("./models/Customer.js"); // Import the Customer model
@@ -15,6 +16,8 @@ const cloudinary = require("./config/cloudinary.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Target = require("./models/Target.js");
+const Report = require("./models/Report.js");
+const Earning = require("./models/Earning.js");
 
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
@@ -610,24 +613,143 @@ app.get("/api/get-total-documents", async (req, res) => {
 app.post("/api/set-target", async (req, res) => {
   const { amount, endDate, startDate } = req.body;
   try {
-    
     // Validate required fields
     if (!amount || !endDate) {
-      return res.status(400).json({ message: "Amount and endDate are required." });
+      return res
+        .status(400)
+        .json({ message: "Amount and endDate are required." });
     }
 
     const target = new Target({
       amount,
       endDate,
-      startDate: startDate || Date.now() // Use startDate from body or default to now
+      startDate: startDate || Date.now(), // Use startDate from body or default to now
     });
 
     await target.save();
     res.status(201).json({ success: true, target });
-  
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.post("/api/deliverd/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { amount, targetId } = req.body;
+  if (!amount || !targetId) {
+    return res
+      .status(400)
+      .json({ message: "Amount and TargetId are required." });
+  }
+  try {
+    const earning = new Earning({
+      targetId,
+      userId,
+      amount,
+    });
+    await earning.save();
+    res.status(201).json({ success: true, earning });
+  } catch (error) {
+    console.log("Error message", error);
+  }
+});
+
+// This runs every hour (adjust interval as needed)
+// cron.schedule('*/10 * * * * *', async () => {
+//   // console.log(`Report generated for target `);
+//   try {
+//     const now = new Date();
+//     // Find active targets whose endDate has passed
+//     const targetsToExpire = await Target.find({
+//       status: 'active',
+//       endDate: { $lte: now }
+//     });
+
+//     for (const target of targetsToExpire) {
+//       // Generate report logic here (simplified)
+//       const reportData = {
+//         targetId: target._id,
+//         totalEarned: 10000, // Example: get from your earnings data
+//         profitLoss: 2000,
+//         categoryBreakdown: { categoryA: 500, categoryB: 1500 },
+//         dateGenerated: now
+//       };
+
+//       // Save the report
+//       await Report.create(reportData);
+
+//       // Update target status to expired/completed
+//       target.status = 'expired';
+//       await target.save();
+//     }
+//   } catch (error) {
+//     console.error('Error while expiring targets:', error);
+//   }
+// });
+
+cron.schedule("* * * * * ", async () => {
+  // Runs every 10 minutes
+  console.log("Running expiration check...");
+
+  try {
+    const now = new Date();
+
+    // Find active targets whose endDate has passed
+    const targetsToExpire = await Target.find({
+      status: "active",
+      endDate: { $lte: now },
+    });
+    console.log("Targets to expire:", targetsToExpire);
+    // if (targetsToExpire.length === 0) {
+    //   console.log("No targets to expire at this time.");
+    //   return;
+    // }
+
+    for (const target of targetsToExpire) {
+      // Aggregate total earnings for this target within its duration
+      const result = await Earning.aggregate([
+        {
+          $match: {
+            targetId: new mongoose.Types.ObjectId(target._id),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$amount" },
+          },
+        },
+      ]);
+
+      console.log("result", result);
+
+      const totalEarned = result.length > 0 ? result[0].totalAmount : 0;
+      const profitLoss = totalEarned - target.amount; // profit if positive, loss if negative
+
+      console.log(
+        profitLoss >= 0 ? `Profit: $${profitLoss}` : `Loss: $${-profitLoss}`
+      );
+
+      // Create and save the report without category breakdown
+      const reportData = {
+        targetId: target._id,
+        totalEarned,
+        profitLoss,
+        dateGenerated: now,
+      };
+      console.log("Report", reportData);
+      await Report.create(reportData);
+
+      // Update the target's status to expired
+      target.status = "expired";
+      await target.save();
+    }
+  } catch (error) {
+    console.error(
+      "Error while expiring targets and generating reports:",
+      error
+    );
   }
 });
 
