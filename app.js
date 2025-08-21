@@ -655,6 +655,54 @@ app.post("/api/deliverd/:userId", async (req, res) => {
   }
 });
 
+app.get("/api/target", async (req, res) => {
+  try {
+    // 1) pehle all earnings ka total nikaal lo (hamesha chahiye)
+    const allEarnings = await Earning.find({});
+    const allTotal = allEarnings.reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // 2) ek active target nikaalo (pura object)
+    const activeTarget = await Target.findOne({ status: "active" });
+
+    // 3) response object start karo
+    let response = { allTotal };
+
+    // 4) agar active target mila to uski earning calculate karo
+    if (activeTarget) {
+      const targetEarnings = await Earning.find({ targetId: activeTarget._id });
+      const targetTotal = targetEarnings.reduce((sum, e) => sum + Number(e.amount), 0);
+
+      // pura activeTarget object + extra fields return karo
+      response.activeTarget = {
+        ...activeTarget.toObject(),
+        targetTotal
+      };
+    }
+
+    // 5) response bhej do
+    res.json(response);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+app.get("/api/reports", async (req, res) => {
+  try {
+    // Fetch all reports with target details
+    const reports = await Report.find({})
+      .populate("targetId", "amount endDate startDate") // Populate target details
+      .sort({ dateGenerated: -1 }) // Sort by date generated, most recent first
+      .lean(); // Use lean for better performance
+
+    res.status(200).json(reports);
+  } catch (error) {
+    console.error("Error fetching reports:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+})
+
 // This runs every hour (adjust interval as needed)
 // cron.schedule('*/10 * * * * *', async () => {
 //   // console.log(`Report generated for target `);
@@ -688,7 +736,7 @@ app.post("/api/deliverd/:userId", async (req, res) => {
 //   }
 // });
 
-cron.schedule("* * * * * ", async () => {
+cron.schedule("*/5 * * * *", async () => {
   // Runs every 10 minutes
   console.log("Running expiration check...");
 
