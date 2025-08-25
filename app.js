@@ -6,18 +6,22 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
-
-const User = require("./models/User.js"); // Import the User model
+const multer = require("multer");
 const Customer = require("./models/Customer.js"); // Import the Customer model
 const Product = require("./models/Product.js");
+const User = require("./models/User.js"); // Import the User model
 const Order = require("./models/Orders.js"); // Import the Order model
 const upload = require("./config/upload.js");
+const uploadProfile = require("./config/uploadProfile.js");
 const cloudinary = require("./config/cloudinary.js");
+const uploadProfileTemp = multer({ dest: "uploads/" }); // sirf temp storage
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Target = require("./models/Target.js");
 const Report = require("./models/Report.js");
 const Earning = require("./models/Earning.js");
+const streamifier = require("streamifier");
+const uploadm = multer({ storage: multer.memoryStorage() });
 
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
@@ -125,6 +129,68 @@ app.post("/api/login", async (req, res, next) => {
     }
   } catch (error) {
     console.log("Erorr", error);
+  }
+});
+
+// Memory storage (no disk usage)
+app.post("/api/change-password", uploadm.single("image"), async (req, res) => {
+  try {
+    const { email, oldPassword, newPassword } = req.body;
+
+    if (!email || !oldPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // 1. User find karo
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    // 2. Old password check karo
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Old password is incorrect." });
+    }
+
+    // 3. Agar password sahi hai aur image bheji gayi hai to upload karo
+    let imageUrl = user.profileImg;
+    if (req.file) {
+      // Purani image delete karo agar hai
+      if (user.profileImg) {
+        const publicId = user.profileImg.split("/").pop().split(".")[0];
+        await cloudinary.uploader.destroy(`ecommerce/profile/${publicId}`);
+      }
+
+      // Buffer se Cloudinary pe upload karo (stream)
+      const uploadStream = () =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "ecommerce/profile" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result.secure_url);
+            }
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(stream);
+        });
+
+      imageUrl = await uploadStream();
+    }
+
+    // 4. Password update karo
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.profileImg = imageUrl;
+    await user.save();
+
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    return res.status(200).json({
+      message: "Password & Profile image updated successfully.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -670,18 +736,20 @@ app.get("/api/target", async (req, res) => {
     // 4) agar active target mila to uski earning calculate karo
     if (activeTarget) {
       const targetEarnings = await Earning.find({ targetId: activeTarget._id });
-      const targetTotal = targetEarnings.reduce((sum, e) => sum + Number(e.amount), 0);
+      const targetTotal = targetEarnings.reduce(
+        (sum, e) => sum + Number(e.amount),
+        0
+      );
 
       // pura activeTarget object + extra fields return karo
       response.activeTarget = {
         ...activeTarget.toObject(),
-        targetTotal
+        targetTotal,
       };
     }
 
     // 5) response bhej do
     res.json(response);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error", error });
@@ -701,41 +769,9 @@ app.get("/api/reports", async (req, res) => {
     console.error("Error fetching reports:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-})
+});
 
 // This runs every hour (adjust interval as needed)
-// cron.schedule('*/10 * * * * *', async () => {
-//   // console.log(`Report generated for target `);
-//   try {
-//     const now = new Date();
-//     // Find active targets whose endDate has passed
-//     const targetsToExpire = await Target.find({
-//       status: 'active',
-//       endDate: { $lte: now }
-//     });
-
-//     for (const target of targetsToExpire) {
-//       // Generate report logic here (simplified)
-//       const reportData = {
-//         targetId: target._id,
-//         totalEarned: 10000, // Example: get from your earnings data
-//         profitLoss: 2000,
-//         categoryBreakdown: { categoryA: 500, categoryB: 1500 },
-//         dateGenerated: now
-//       };
-
-//       // Save the report
-//       await Report.create(reportData);
-
-//       // Update target status to expired/completed
-//       target.status = 'expired';
-//       await target.save();
-//     }
-//   } catch (error) {
-//     console.error('Error while expiring targets:', error);
-//   }
-// });
-
 cron.schedule("*/5 * * * *", async () => {
   // Runs every 10 minutes
   console.log("Running expiration check...");
