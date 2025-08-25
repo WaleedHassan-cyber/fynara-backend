@@ -14,7 +14,6 @@ const Order = require("./models/Orders.js"); // Import the Order model
 const upload = require("./config/upload.js");
 const uploadProfile = require("./config/uploadProfile.js");
 const cloudinary = require("./config/cloudinary.js");
-const uploadProfileTemp = multer({ dest: "uploads/" }); // sirf temp storage
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Target = require("./models/Target.js");
