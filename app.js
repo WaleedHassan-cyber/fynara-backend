@@ -21,13 +21,12 @@ const Report = require("./models/Report.js");
 const Earning = require("./models/Earning.js");
 const streamifier = require("streamifier");
 const uploadm = multer({ storage: multer.memoryStorage() });
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
 
 app.use(
   cors({
@@ -35,18 +34,21 @@ app.use(
     credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.options(/.*/, cors());
+
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("MongoDB connected");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
+.connect(process.env.MONGODB_URI)
+.then(() => {
+  console.log("MongoDB connected");
+})
+.catch((err) => {
+  console.error("MongoDB connection error:", err);
+});
 
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
 //Register route for Owner
 if (process.env.NODE_ENV === "production") {
   app.post("/api/register", async (req, res) => {
@@ -118,6 +120,7 @@ app.post("/api/login", async (req, res, next) => {
                   id: user._id,
                   email: user.email,
                   username: user.username,
+                  profileImg:user.profileImg
                 },
                 token: token,
               });
@@ -772,7 +775,7 @@ app.get("/api/reports", async (req, res) => {
 
 // This runs every hour (adjust interval as needed)
 cron.schedule("*/5 * * * *", async () => {
-  // Runs every 10 minutes
+  // Runs every 05 minutes
   console.log("Running expiration check...");
 
   try {
@@ -784,10 +787,10 @@ cron.schedule("*/5 * * * *", async () => {
       endDate: { $lte: now },
     });
     console.log("Targets to expire:", targetsToExpire);
-    // if (targetsToExpire.length === 0) {
-    //   console.log("No targets to expire at this time.");
-    //   return;
-    // }
+    if (targetsToExpire.length === 0) {
+      console.log("No targets to expire at this time.");
+      return;
+    }
 
     for (const target of targetsToExpire) {
       // Aggregate total earnings for this target within its duration
