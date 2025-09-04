@@ -27,7 +27,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
 
-
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173", // Adjust the origin as needed
@@ -38,13 +37,13 @@ app.options(/.*/, cors());
 
 // MongoDB connection
 mongoose
-.connect(process.env.MONGODB_URI)
-.then(() => {
-  console.log("MongoDB connected");
-})
-.catch((err) => {
-  console.error("MongoDB connection error:", err);
-});
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log("MongoDB connected");
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -111,16 +110,17 @@ app.post("/api/login", async (req, res, next) => {
               // Set cookie
               res.cookie("authToken", token, {
                 httpOnly: true,
-                secure:true, // Use secure cookies in production
-                sameSite: "None",
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "None", // 👈 Strict → None
+                maxAge: 24 * 60 * 60 * 1000,
               });
+
               return res.status(200).json({
                 user: {
                   id: user._id,
                   email: user.email,
                   username: user.username,
-                  profileImg:user.profileImg
+                  profileImg: user.profileImg,
                 },
                 token: token,
               });
