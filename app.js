@@ -259,7 +259,7 @@ app.post("/api/customer/login", async (req, res, next) => {
               res.cookie("authToken", token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-                sameSite: "Strict",
+                sameSite: "None",
                 maxAge: 24 * 60 * 60 * 1000, // 1 day
               });
               return res.status(200).json({
