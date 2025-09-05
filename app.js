@@ -27,12 +27,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 const PORT = process.env.PORT || 8000;
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173", // Adjust the origin as needed
-    credentials: true, // Allow credentials (cookies, authorization headers, etc.)
-  })
-);
+const allowedOrigin = process.env.CLIENT_URL || 'https://shoppii-admin.vercel.app';
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', allowedOrigin); // Allow specific origin
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE'); // Allowed methods
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allowed headers
+  next();
+});
+// app.options('*', cors()); // Enable CORS preflight requests for all routes
+
 app.options(/.*/, cors());
 
 // MongoDB connection
