@@ -85,64 +85,65 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 //Login route for owner
-app.post("/api/login", async (req, res, next) => {
+app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).send("Plz Enter all required feilds");
-    } else {
-      const user = await User.findOne({ email });
-      if (!user) {
-        res.status(400).send("Email or Password incorrect");
-      } else {
-        const validateUser = await bcrypt.compare(password, user.password);
-        if (!validateUser) {
-          res.status(400).send("Email or Password incorrect");
-        } else {
-          const payload = {
-            userId: user.id,
-            email: user.email,
-          };
-          const JWT_SECRET_KEY =
-            process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
-          jwt.sign(
-            payload,
-            JWT_SECRET_KEY,
-            { expiresIn: 84600 },
-            async (err, token) => {
-              await User.updateOne(
-                { _id: user.id },
-                {
-                  $set: { token },
-                }
-              );
-              user.save();
-              // Set cookie
-              res.cookie("authToken", token, {
-                httpOnly: true,
-                secure: true, // 👈 Use secure cookies in production
-                sameSite: "None", // 👈 Strict → None
-                maxAge: 24 * 60 * 60 * 1000,
-              });
 
-              return res.status(200).json({
-                user: {
-                  id: user._id,
-                  email: user.email,
-                  username: user.username,
-                  profileImg: user.profileImg,
-                },
-                token: token,
-              });
-            }
-          );
-        }
-      }
+    if (!email || !password) {
+      return res.status(400).send("Please enter all required fields");
     }
+
+    // 1. User find karo
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).send("Email or Password incorrect");
+    }
+
+    // 2. Password check karo
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(400).send("Email or Password incorrect");
+    }
+
+    // 3. Payload
+    const payload = {
+      userId: user._id,
+      email: user.email,
+    };
+
+    // 4. Token create karo
+    const JWT_SECRET_KEY =
+      process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
+
+    const token = jwt.sign(payload, JWT_SECRET_KEY, { expiresIn: "7d" }); // 👈 7d
+
+    // (Optional: agar db me token store karna hai)
+    await User.updateOne({ _id: user._id }, { $set: { token } });
+
+    // 5. Cookie set karo
+    res.cookie("authToken", token, {
+      httpOnly: true,      // frontend se JS access nahi
+      secure: true,        // sirf HTTPS (Vercel ke liye required)
+      sameSite: "None",    // 👈 cross-site allowed
+      path: "/",           // har route pe cookie send hogi
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 din
+    });
+
+    // 6. Response bhejo
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        profileImg: user.profileImg,
+      },
+    });
   } catch (error) {
-    console.log("Erorr", error);
+    console.error("Login Error:", error);
+    return res.status(500).send("Server Error");
   }
 });
+
 
 // Memory storage (no disk usage)
 app.post("/api/change-password", uploadm.single("image"), async (req, res) => {
