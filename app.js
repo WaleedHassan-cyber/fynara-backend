@@ -800,7 +800,7 @@ app.get("/api/reports", async (req, res) => {
 cron.schedule("*/5 * * * *", async () => {
   // Runs every 05 minutes
   console.log("Running expiration check...");
-   await connectDB();
+  //  await connectDB();
   try {
     const now = new Date();
 
