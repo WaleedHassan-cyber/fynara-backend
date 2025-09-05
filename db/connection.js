@@ -1,4 +1,22 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 
-mongoose.connect(process.env.MONGODB_URI).then(()=>console.log("Db Connected")).catch((e)=> console.log("Error",e))
+let isConnected = false; // Global connection state
 
+async function connectDB() {
+  if (isConnected) return; // Agar already connect hai to skip
+
+  try {
+    const db = await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    isConnected = db.connections[0].readyState;
+    console.log("✅ MongoDB connected");
+  } catch (error) {
+    console.error("❌ MongoDB connection error:", error);
+    throw error;
+  }
+}
+
+module.exports = connectDB;

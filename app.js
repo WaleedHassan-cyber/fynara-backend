@@ -31,7 +31,7 @@ const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [
   process.env.CLIENT_URL || "https://shoppii-admin.vercel.app",
-  "http://localhost:3000"
+  "http://localhost:5173"
 ];
 
 app.use(
@@ -53,8 +53,8 @@ app.options(/.*/, cors());
 
 
 // MongoDB connection
-require("./db/connection.js");
-
+const connectDB = require("./db/connection.js");
+connectDB()
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
@@ -850,9 +850,9 @@ cron.schedule("*/5 * * * *", async () => {
   }
 });
 
-// app.listen(PORT, () => {
-//   console.log(`Server is running on port ${PORT}`);
-// });
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 // ✅ Ye export karo
 module.exports = app;
 module.exports.handler = serverless(app);
