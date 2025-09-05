@@ -48,8 +48,8 @@ const connectDB = require("./db.js"); //vercel
 // pehle connect once
 connectDB();
 
-app.get("/", async(req, res) => {
-   await connectDB();
+app.get("/", (req, res) => {
+  //  await connectDB();
   res.send("Hello World!");
 });
 //Register route for Owner
