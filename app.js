@@ -36,21 +36,26 @@ app.use(
 app.options(/.*/, cors());
 
 // MongoDB connection
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("MongoDB connected");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
+// mongoose
+//   .connect(process.env.MONGODB_URI)
+//   .then(() => {
+//     console.log("MongoDB connected");
+//   })
+//   .catch((err) => {
+//     console.error("MongoDB connection error:", err);
+//   });
+const connectDB = require("./db.js"); //vercel
+// pehle connect once
+connectDB();
 
-app.get("/", (req, res) => {
+app.get("/", async(req, res) => {
+   await connectDB();
   res.send("Hello World!");
 });
 //Register route for Owner
 if (process.env.NODE_ENV === "production") {
   app.post("/api/register", async (req, res) => {
+     await connectDB();
     const { username, password, email } = req.body;
     try {
       if (!username || !password || !email) {
@@ -77,6 +82,7 @@ if (process.env.NODE_ENV === "production") {
 //Login route for owner
 app.post("/api/login", async (req, res, next) => {
   try {
+     await connectDB();
     const { email, password } = req.body;
     if (!email || !password) {
       res.status(400).send("Plz Enter all required feilds");
@@ -137,6 +143,7 @@ app.post("/api/login", async (req, res, next) => {
 // Memory storage (no disk usage)
 app.post("/api/change-password", uploadm.single("image"), async (req, res) => {
   try {
+     await connectDB();
     const { email, oldPassword, newPassword } = req.body;
 
     if (!email || !oldPassword || !newPassword) {
@@ -198,6 +205,7 @@ app.post("/api/change-password", uploadm.single("image"), async (req, res) => {
 
 //register route for Customer
 app.post("/api/customer/register", async (req, res) => {
+   await connectDB();
   const { username, password, email, address, phone } = req.body;
   try {
     if (!username || !password || !email || !address || !phone) {
@@ -224,6 +232,7 @@ app.post("/api/customer/register", async (req, res) => {
 });
 //Login route for Customer
 app.post("/api/customer/login", async (req, res, next) => {
+   await connectDB();
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -305,8 +314,9 @@ app.get("/api/check-auth", (req, res) => {
 //create products
 app.post("/api/create", upload.array("images", 4), async (req, res) => {
   try {
-    console.log("FILES RECEIVED:", req.files);
-    console.log("BODY RECEIVED:", req.body);
+     await connectDB();
+    // console.log("FILES RECEIVED:", req.files);
+    // console.log("BODY RECEIVED:", req.body);
 
     const { productName, type, label, desc, price } = req.body;
 
@@ -341,6 +351,7 @@ app.post("/api/create", upload.array("images", 4), async (req, res) => {
 //get products
 app.get("/api/products", async (req, res) => {
   try {
+     await connectDB();
     const products = await Product.find().lean();
 
     res.status(200).json(products);
@@ -352,6 +363,7 @@ app.get("/api/products", async (req, res) => {
 
 //Update products
 app.post("/api/update-products", async (req, res) => {
+   await connectDB();
   try {
     const { products } = req.body;
 
@@ -397,6 +409,7 @@ app.post("/api/update-products", async (req, res) => {
 
 //delete products
 app.delete("/api/products/:id", async (req, res) => {
+   await connectDB();
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -425,6 +438,7 @@ app.delete("/api/products/:id", async (req, res) => {
 
 //post customer Orders✅
 app.post("/api/orders/:userId", async (req, res) => {
+   await connectDB();
   try {
     const { userId } = req.params;
     const { products } = req.body;
@@ -496,6 +510,7 @@ app.post("/api/orders/:userId", async (req, res) => {
 
 //fetch orders for a specific user✅
 app.get("/api/orders/:userId", async (req, res) => {
+   await connectDB();
   try {
     const { userId } = req.params;
 
@@ -544,6 +559,7 @@ app.get("/api/orders/:userId", async (req, res) => {
 
 // All orders of all users✅
 app.get("/api/orders", async (req, res) => {
+   await connectDB();
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -609,6 +625,7 @@ app.get("/api/orders", async (req, res) => {
 });
 
 app.post("/api/update-status/:orderId", async (req, res) => {
+   await connectDB();
   const { orderId } = req.params;
   const { status } = req.body;
 
@@ -637,6 +654,7 @@ app.post("/api/update-status/:orderId", async (req, res) => {
 });
 
 app.post("/api/delete-order/:orderId", async (req, res) => {
+   await connectDB();
   const { orderId } = req.params;
 
   if (!orderId)
@@ -659,6 +677,7 @@ app.post("/api/delete-order/:orderId", async (req, res) => {
 });
 
 app.get("/api/get-total-documents", async (req, res) => {
+   await connectDB();
   try {
     const totalProducts = await Product.countDocuments();
     const totalOrders = await Order.countDocuments();
@@ -679,6 +698,7 @@ app.get("/api/get-total-documents", async (req, res) => {
 });
 
 app.post("/api/set-target", async (req, res) => {
+   await connectDB();
   const { amount, endDate, startDate } = req.body;
   try {
     // Validate required fields
@@ -703,6 +723,7 @@ app.post("/api/set-target", async (req, res) => {
 });
 
 app.post("/api/deliverd/:userId", async (req, res) => {
+   await connectDB();
   const { userId } = req.params;
   const { amount, targetId } = req.body;
   if (!amount || !targetId) {
@@ -724,6 +745,7 @@ app.post("/api/deliverd/:userId", async (req, res) => {
 });
 
 app.get("/api/target", async (req, res) => {
+   await connectDB();
   try {
     // 1) pehle all earnings ka total nikaal lo (hamesha chahiye)
     const allEarnings = await Earning.find({});
@@ -759,6 +781,7 @@ app.get("/api/target", async (req, res) => {
 });
 
 app.get("/api/reports", async (req, res) => {
+   await connectDB();
   try {
     // Fetch all reports with target details
     const reports = await Report.find({})
@@ -777,7 +800,7 @@ app.get("/api/reports", async (req, res) => {
 cron.schedule("*/5 * * * *", async () => {
   // Runs every 05 minutes
   console.log("Running expiration check...");
-
+   await connectDB();
   try {
     const now = new Date();
 
