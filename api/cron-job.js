@@ -4,7 +4,7 @@ const Earning = require("../models/Earning.js");
 const Report = require("../models/Report.js");
 const connectDB = require("../db/connection.js");
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     await connectDB(); // Connect to MongoDB
 
@@ -56,4 +56,4 @@ export default async function handler(req, res) {
     console.error("Error processing targets:", error);
     res.status(500).json({ message: "Error processing targets", error });
   }
-}
+};
