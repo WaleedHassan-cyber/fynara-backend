@@ -131,6 +131,7 @@ app.post("/api/login", async (req, res) => {
 
     // 6. Response bhejo
     return res.status(200).json({
+      token,
       user: {
         id: user._id,
         email: user.email,
