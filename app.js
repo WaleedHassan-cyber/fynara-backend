@@ -314,6 +314,16 @@ app.get("/api/check-auth", (req, res) => {
   }
 });
 
+app.get("/api/logout", (req, res) => {
+  res.clearCookie("authToken", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+  });
+  return res.status(200).json({ message: "Logged out successfully" });
+});
+
+
 //create products
 app.post("/api/create", upload.array("images", 4), async (req, res) => {
   try {
