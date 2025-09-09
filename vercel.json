@@ -6,8 +6,8 @@
   ],
   "routes": [
     
-    { "src": "/(.*)", "dest": "app.js" },
-    { "src": "/api/(.*)", "dest": "api/$1" }
+    { "src": "/api/(.*)", "dest": "api/$1" },
+    { "src": "/(.*)", "dest": "app.js" }
   ],
   "crons": [{ "path": "/api/cron-job", "schedule": "0 1 * * *" }]
 }
