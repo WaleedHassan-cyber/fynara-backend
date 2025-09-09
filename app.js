@@ -45,7 +45,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
 
@@ -144,7 +144,6 @@ app.post("/api/login", async (req, res) => {
     return res.status(500).send("Server Error");
   }
 });
-
 
 // Memory storage (no disk usage)
 app.post("/api/change-password", uploadm.single("image"), async (req, res) => {
