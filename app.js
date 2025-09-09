@@ -39,7 +39,7 @@ app.use(
     origin: function (origin, callback) {
       console.log("Origin:", origin)
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, "https://shoppii-admin.vercel.app");
+        callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
