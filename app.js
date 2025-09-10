@@ -30,22 +30,19 @@ const PORT = process.env.PORT || 8000;
 // const cors = require("cors");
 
 const allowedOrigins = [
-  process.env.CLIENT_URL || "https://shoppii-admin.vercel.app",
+  "https://shoppii-admin.vercel.app",
   "http://localhost:5173"
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      console.log("Origin:", origin)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
     credentials: true,
   })
 );
