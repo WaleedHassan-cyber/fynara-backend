@@ -9,5 +9,16 @@
     { "src": "/api/(.*)", "dest": "api/$1" },
     { "src": "/(.*)", "dest": "app.js" }
   ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://shoppii-admin.vercel.app" },
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" }
+      ]
+    }
+  ],
   "crons": [{ "path": "/api/cron-job", "schedule": "0 1 * * *" }]
 }
