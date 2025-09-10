@@ -5,20 +5,22 @@
     { "src": "app.js", "use": "@vercel/node" }
   ],
   "routes": [
-    
-    { "src": "/api/(.*)", "dest": "api/$1" },
-    { "src": "/(.*)", "dest": "app.js" }
-  ],
-  "headers": [
     {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://shoppii-admin.vercel.app" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" }
-      ]
+      "src": "/api/(.*)",
+      "dest": "api/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "https://shoppii-admin.vercel.app",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app.js"
     }
   ],
-  "crons": [{ "path": "/api/cron-job", "schedule": "0 1 * * *" }]
+  "crons": [
+    { "path": "/api/cron-job", "schedule": "0 1 * * *" }
+  ]
 }
