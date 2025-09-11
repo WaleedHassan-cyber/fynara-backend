@@ -19,6 +19,7 @@ const jwt = require("jsonwebtoken");
 const Target = require("./models/Target.js");
 const Report = require("./models/Report.js");
 const Earning = require("./models/Earning.js");
+const checkAndExpireTargets = require("./middleware/targetExpCheck.js");
 const streamifier = require("streamifier");
 const uploadm = multer({ storage: multer.memoryStorage() });
 app.use(express.json());
@@ -700,7 +701,7 @@ app.get("/api/get-total-documents", async (req, res) => {
   }
 });
 
-app.post("/api/set-target", async (req, res) => {
+app.post("/api/set-target",async (req, res) => {
   const { amount, endDate, startDate } = req.body;
   try {
     // Validate required fields
@@ -745,7 +746,7 @@ app.post("/api/deliverd/:userId", async (req, res) => {
   }
 });
 
-app.get("/api/target", async (req, res) => {
+app.get("/api/target", checkAndExpireTargets ,async (req, res) => {
   try {
     // 1) pehle all earnings ka total nikaal lo (hamesha chahiye)
     const allEarnings = await Earning.find({});
@@ -796,70 +797,7 @@ app.get("/api/reports", async (req, res) => {
 });
 
 // This runs every hour (adjust interval as needed)
-// cron.schedule("*/5 * * * *", async () => {
-//   // Runs every 05 minutes
-//   console.log("Running expiration check...");
 
-//   try {
-//     const now = new Date();
-
-//     // Find active targets whose endDate has passed
-//     const targetsToExpire = await Target.find({
-//       status: "active",
-//       endDate: { $lte: now },
-//     });
-//     console.log("Targets to expire:", targetsToExpire);
-//     if (targetsToExpire.length === 0) {
-//       console.log("No targets to expire at this time.");
-//       return;
-//     }
-
-//     for (const target of targetsToExpire) {
-//       // Aggregate total earnings for this target within its duration
-//       const result = await Earning.aggregate([
-//         {
-//           $match: {
-//             targetId: new mongoose.Types.ObjectId(target._id),
-//           },
-//         },
-//         {
-//           $group: {
-//             _id: null,
-//             totalAmount: { $sum: "$amount" },
-//           },
-//         },
-//       ]);
-
-//       console.log("result", result);
-
-//       const totalEarned = result.length > 0 ? result[0].totalAmount : 0;
-//       const profitLoss = totalEarned - target.amount; // profit if positive, loss if negative
-
-//       console.log(
-//         profitLoss >= 0 ? `Profit: $${profitLoss}` : `Loss: $${-profitLoss}`
-//       );
-
-//       // Create and save the report without category breakdown
-//       const reportData = {
-//         targetId: target._id,
-//         totalEarned,
-//         profitLoss,
-//         dateGenerated: now,
-//       };
-//       console.log("Report", reportData);
-//       await Report.create(reportData);
-
-//       // Update the target's status to expired
-//       target.status = "expired";
-//       await target.save();
-//     }
-//   } catch (error) {
-//     console.error(
-//       "Error while expiring targets and generating reports:",
-//       error
-//     );
-//   }
-// });
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
