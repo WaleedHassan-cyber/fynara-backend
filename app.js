@@ -4,15 +4,12 @@ const app = express();
 const serverless = require("serverless-http");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const mongoose = require("mongoose");
-const cron = require("node-cron");
 const multer = require("multer");
 const Customer = require("./models/Customer.js"); // Import the Customer model
 const Product = require("./models/Product.js");
 const User = require("./models/User.js"); // Import the User model
 const Order = require("./models/Orders.js"); // Import the Order model
 const upload = require("./config/upload.js");
-const uploadProfile = require("./config/uploadProfile.js");
 const cloudinary = require("./config/cloudinary.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -446,6 +443,46 @@ app.delete("/api/products/:id", async (req, res) => {
   }
 });
 
+app.post("/api/cart/add", async (req, res) => {
+  const { userId, productId, quantity, selectedColor, selectedSize, price } = req.body;
+
+  if (!userId || !productId || !quantity) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Check if item already in cart with same options
+    const existingIndex = user.cartItems.findIndex(
+      (item) =>
+        item.productId.toString() === productId &&
+        item.selectedColor === selectedColor &&
+        item.selectedSize === selectedSize
+    );
+
+    if (existingIndex !== -1) {
+      // Increase quantity
+      user.cartItems[existingIndex].quantity += quantity;
+    } else {
+      // Add new item
+      user.cartItems.push({
+        productId,
+        quantity,
+        selectedColor,
+        selectedSize,
+        price,
+      });
+    }
+
+    await user.save();
+    return res.json({ message: "Item added to cart", cartItems: user.cartItems });
+  } catch (error) {
+    console.error("Add to cart error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
 //post customer Orders✅
 app.post("/api/orders/:userId", async (req, res) => {
   try {
