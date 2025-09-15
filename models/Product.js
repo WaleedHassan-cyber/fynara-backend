@@ -13,28 +13,50 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
+    brand: {
+        type: String,
+        required: false, // optional
     },
     price: {
         type: Number,
-        required:true
+        required: true,
     },
-    desc:{
-        type:String,
-        required:true
+    oldPrice: {
+        type: Number,
+        required: false, // optional
     },
+    desc: {
+        type: String,
+        required: true,
+    },
+    reviews: {
+        type: Number,
+        default: 0,
+    },
+    colors: [
+        {
+            type: String, // hex code string e.g. "#D12B2B"
+        },
+    ],
+    sizes: [
+        {
+            type: String, // e.g. "XS", "M", "L"
+        },
+    ],
     images: [
-    {
-      url: String,
-      public_id: String,
-    },
-],
+        {
+            url: { type: String, required: true },
+            public_id: { type: String },
+        },
+    ],
     inStock: {
         type: Boolean,
         default: true,
     },
-})
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
+});
 
 module.exports = mongoose.model('Product', productSchema);

@@ -328,7 +328,18 @@ app.post("/api/create", upload.array("images", 4), async (req, res) => {
     console.log("FILES RECEIVED:", req.files);
     console.log("BODY RECEIVED:", req.body);
 
-    const { productName, type, label, desc, price } = req.body;
+    const {
+      productName,
+      type,
+      label,
+      desc,
+      price,
+      oldPrice,
+      brand,
+      reviews,
+      colors,
+      sizes,
+    } = req.body;
 
     if (!req.files || req.files.length === 0) {
       return res
@@ -336,10 +347,21 @@ app.post("/api/create", upload.array("images", 4), async (req, res) => {
         .json({ success: false, message: "No images uploaded" });
     }
 
+    // images array
     const images = req.files.map((file) => ({
       url: file.path,
       public_id: file.filename,
     }));
+
+    // parse JSON fields (colors, sizes)
+    let parsedColors = [];
+    let parsedSizes = [];
+    try {
+      parsedColors = colors ? JSON.parse(colors) : [];
+      parsedSizes = sizes ? JSON.parse(sizes) : [];
+    } catch (err) {
+      console.error("JSON parse error:", err);
+    }
 
     const product = new Product({
       productName,
@@ -347,6 +369,11 @@ app.post("/api/create", upload.array("images", 4), async (req, res) => {
       label,
       desc,
       price,
+      oldPrice: oldPrice || null,
+      brand: brand || "",
+      reviews: reviews ? Number(reviews) : 0,
+      colors: parsedColors,
+      sizes: parsedSizes,
       images,
     });
 
@@ -354,10 +381,11 @@ app.post("/api/create", upload.array("images", 4), async (req, res) => {
 
     res.status(201).json({ success: true, product });
   } catch (err) {
-    console.error("UPLOAD ERROR:", err); // 👈 proper logging
+    console.error("UPLOAD ERROR:", err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 });
+
 //get products
 app.get("/api/products", async (req, res) => {
   try {
@@ -369,7 +397,18 @@ app.get("/api/products", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch products" });
   }
 });
-
+app.get("/api/products/:id", async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id).lean();
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    res.status(200).json(product);
+  } catch (error) {
+    console.error("Error fetching product:", error.message);
+    res.status(500).json({ message: "Failed to fetch product" });
+  }
+})
 //Update products
 app.post("/api/update-products", async (req, res) => {
   try {
