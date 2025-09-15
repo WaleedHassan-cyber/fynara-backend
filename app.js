@@ -233,64 +233,66 @@ app.post("/api/customer/register", async (req, res) => {
   }
 });
 //Login route for Customer
-app.post("/api/customer/login", async (req, res, next) => {
+app.post("/api/customer/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      res.status(400).send("Plz Enter all required feilds");
-    } else {
-      const user = await Customer.findOne({ email });
-      if (!user) {
-        res.status(400).send("Email or Password incorrect");
-      } else {
-        const validateUser = await bcrypt.compare(password, user.password);
-        if (!validateUser) {
-          res.status(400).send("Email or Password incorrect");
-        } else {
-          const payload = {
-            userId: user.id,
-            email: user.email,
-          };
-          const JWT_SECRET_KEY =
-            process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
-          jwt.sign(
-            payload,
-            JWT_SECRET_KEY,
-            { expiresIn: 84600 },
-            async (err, token) => {
-              await Customer.updateOne(
-                { _id: user.id },
-                {
-                  $set: { token },
-                }
-              );
-              user.save();
-              // Set cookie
-              res.cookie("authToken", token, {
-                httpOnly: true,
-                secure: true, // Use secure cookies in production
-                sameSite: "None",
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
-              });
-              return res.status(200).json({
-                user: {
-                  id: user._id,
-                  username: user.username,
-                  email: user.email,
-                  address: user.address,
-                  phone: user.phone,
-                },
-                token: token,
-              });
-            }
-          );
-        }
-      }
+      return res.status(400).json({ message: "Please enter all required fields" });
     }
+
+    const user = await Customer.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Email or Password incorrect" });
+    }
+
+    const validateUser = await bcrypt.compare(password, user.password);
+    if (!validateUser) {
+      return res.status(400).json({ message: "Email or Password incorrect" });
+    }
+
+    const payload = {
+      userId: user.id,
+      email: user.email,
+    };
+
+    const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
+
+    jwt.sign(payload, JWT_SECRET_KEY, { expiresIn: 84600 }, async (err, token) => {
+      if (err) {
+        return res.status(500).json({ message: "Token generation failed" });
+      }
+
+      await Customer.updateOne(
+        { _id: user.id },
+        { $set: { token } }
+      );
+
+      // Set cookie
+      res.cookie("authToken", token, {
+        httpOnly: true,
+        secure: true, // only in production
+        sameSite: "None",
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+      });
+
+      return res.status(200).json({
+        message: "Login successful",
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          address: user.address,
+          phone: user.phone,
+        },
+        token,
+      });
+    });
   } catch (error) {
-    console.log("Erorr", error);
+    console.error("Error", error);
+    return res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // Example: /api/check-auth
 app.get("/api/check-auth", (req, res) => {
@@ -490,7 +492,7 @@ app.post("/api/cart/add", async (req, res) => {
   }
 
   try {
-    const user = await User.findById(userId);
+    const user = await Customer.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Check if item already in cart with same options
@@ -522,6 +524,68 @@ app.post("/api/cart/add", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
+// Get User Cart
+// get user cart
+app.get("/api/cart/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await Customer.findById(userId).populate("cartItems.productId"); 
+    // 👆 productId populate karenge taki product details bhi mil jaye
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({ cartItems: user.cartItems });
+  } catch (error) {
+    console.error("Fetch cart error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+app.post("/api/cart/update/:userId", async (req, res) => {
+ try {
+    const { userId } = req.params;
+    const { items } = req.body; // [{id, quantity, selectedColor, selectedSize, price}]
+
+    const user = await Customer.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    items.forEach((updatedItem) => {
+      const index = user.cartItems.findIndex(
+        (c) => c._id.toString() === updatedItem.id
+      );
+      if (index !== -1) {
+        user.cartItems[index].quantity = updatedItem.quantity;
+        user.cartItems[index].selectedColor = updatedItem.selectedColor;
+        user.cartItems[index].selectedSize = updatedItem.selectedSize;
+        user.cartItems[index].price = updatedItem.price;
+      }
+    });
+
+    await user.save();
+    return res.json({ message: "Cart updated", cartItems: user.cartItems });
+  } catch (error) {
+    console.error("Update cart error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+})
+app.post("/api/cart/delete/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { keepIds } = req.body; // un items ka array jo rakhne hain
+
+    const user = await Customer.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.cartItems = user.cartItems.filter((c) =>
+      keepIds.includes(c._id.toString())
+    );
+
+    await user.save();
+    return res.json({ message: "Unselected items deleted", cartItems: user.cartItems });
+  } catch (error) {
+    console.error("Delete cart error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+})
 //post customer Orders✅
 app.post("/api/orders/:userId", async (req, res) => {
   try {
