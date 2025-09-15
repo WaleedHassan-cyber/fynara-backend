@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 8000;
 // const cors = require("cors");
 
 const allowedOrigins = [
-  process.env.CLIENT_URL || "https://shoppii-admin.vercel.app",
+  process.env.CLIENT_URL || "https://shoppii-store.vercel.app",
   "http://localhost:5173"
 ];
 
