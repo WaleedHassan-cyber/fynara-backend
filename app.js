@@ -136,6 +136,8 @@ app.post("/api/login", async (req, res) => {
         email: user.email,
         username: user.username,
         profileImg: user.profileImg,
+        
+
       },
     });
   } catch (error) {
@@ -283,6 +285,7 @@ app.post("/api/customer/login", async (req, res) => {
           email: user.email,
           address: user.address,
           phone: user.phone,
+         cartCount: user.cartItems ? user.cartItems.length : 0,
         },
         token,
       });
