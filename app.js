@@ -707,7 +707,50 @@ app.get("/api/orders/:userId", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+app.get("/api/most-selling-products", async (req, res) => {
+  try {
+    // 1. Latest target fetch karo
+    const latestTarget = await Target.findOne().sort({ createdAt: -1 });
+    if (!latestTarget) {
+      return res.status(404).json({ success: false, message: "No targets found" });
+    }
 
+    // 2. Aggregate only that target
+    const topProducts = await Earning.aggregate([
+      {
+        $match: { targetId: latestTarget._id } // filter same target
+      },
+      {
+        $lookup: {
+          from: "products",
+          localField: "productId", // ⚠️ earning schema me direct productId ho to use karo
+          foreignField: "_id",
+          as: "product"
+        }
+      },
+      { $unwind: "$product" },
+      {
+        $group: {
+          _id: "$product._id",
+          productName: { $first: "$product.productName" },
+          totalEarning: { $sum: "$amount" },
+          image: { $first: { $arrayElemAt: ["$product.images.url", 0] } }
+        }
+      },
+      { $sort: { totalEarning: -1 } },
+      { $limit: 6 }
+    ]);
+
+    return res.json({
+      success: true,
+      target: latestTarget._id,
+      topProducts
+    });
+  } catch (error) {
+    console.error("Most selling recent target error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+})
 // All orders of all users✅
 app.get("/api/orders", async (req, res) => {
   try {
