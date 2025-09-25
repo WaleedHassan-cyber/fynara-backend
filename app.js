@@ -521,7 +521,7 @@ app.post("/api/cart/add", async (req, res) => {
     }
 
     await user.save();
-    return res.json({ message: "Item added to cart", cartItems: user.cartItems });
+    return res.json({ message: "Item added to cart", cartItems: user.cartItems ,cartCount: user.cartItems.length});
   } catch (error) {
     console.error("Add to cart error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -583,7 +583,7 @@ app.post("/api/cart/delete/:userId", async (req, res) => {
     );
 
     await user.save();
-    return res.json({ message: "Unselected items deleted", cartItems: user.cartItems });
+    return res.json({ message: "Unselected items deleted", cartItems: user.cartItems , cartCount: user.cartItems.length});
   } catch (error) {
     console.error("Delete cart error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -593,7 +593,7 @@ app.post("/api/cart/delete/:userId", async (req, res) => {
 app.post("/api/orders/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { products } = req.body;
+    const { products, OPostCode, OAddress, OTehsil } = req.body;
 
     if (!userId || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "Invalid order data" });
@@ -623,21 +623,31 @@ app.post("/api/orders/:userId", async (req, res) => {
 
     let totalAmount = 0;
 
-    for (const item of products) {
+    const finalProducts = products.map((item) => {
       const prod = productMap.get(item.product);
       if (!prod) {
-        return res
-          .status(400)
-          .json({ message: `Product not found: ${item.product}` });
+        throw new Error(`Product not found: ${item.product}`);
       }
 
+      // ✅ Calculate total
       totalAmount += prod.price * item.quantity;
-    }
+
+      // ✅ Return product object with size & color
+      return {
+        product: item.product,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize || null,
+        selectedColor: item.selectedColor || null,
+      };
+    });
 
     // Create new order
     const newOrder = new Order({
       user: userId,
-      products,
+      products: finalProducts,
+      OPostCode,
+      OAddress,
+      OTehsil,
       totalAmount,
       status: "Pending",
     });
@@ -646,17 +656,19 @@ app.post("/api/orders/:userId", async (req, res) => {
 
     // Re-fetch the order with populated product details
     const populatedOrder = await Order.findById(newOrder._id)
-      .populate("products.product") // make sure schema has ref
-      .populate("user"); // optional: populate user info
+      .populate("products.product")
+      .populate("user");
 
-    res
-      .status(201)
-      .json({ message: "Order created successfully", order: populatedOrder });
+    res.status(201).json({
+      message: "Order created successfully",
+      order: populatedOrder,
+    });
   } catch (error) {
     console.error("Error creating order:", error.stack);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 });
 

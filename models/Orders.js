@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+
 const orderSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -16,8 +17,30 @@ const orderSchema = new mongoose.Schema({
       required: true,
       min: 1,
       default: 1
+    },
+    selectedSize: {
+      type: String,
+      required: false, // optional
+      default: "M"
+    },
+    selectedColor: {
+      type: String,
+      required: false, // optional
+      default: "Siganture"
     }
   }],
+  OPostCode: {
+    type: String,
+    required: true
+  },
+  OAddress: {
+    type: String,
+    required: true
+  },
+  OTehsil: {
+    type: String,
+    required: true
+  },
   totalAmount: {
     type: Number,
     required: true
@@ -37,7 +60,7 @@ const orderSchema = new mongoose.Schema({
 orderSchema.pre('save', async function (next) {
   if (!this.isModified('products')) return next();
 
-  await this.populate('products.product'); // ✅ Fix: Removed execPopulate
+  await this.populate('products.product'); // ✅ populate for price
 
   this.totalAmount = this.products.reduce((total, item) => {
     return total + item.product.price * item.quantity;
@@ -45,7 +68,6 @@ orderSchema.pre('save', async function (next) {
 
   next();
 });
-
 
 orderSchema.index({ user: 1 });
 orderSchema.index({ status: 1 });
