@@ -29,13 +29,15 @@ const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [
   process.env.CLIENT_URL || "https://shoppii-admin.vercel.app",
-  "http://localhost:5173","https://shoppii-store.vercel.app"
+  "http://localhost:5173",
+  "https://shoppii-store.vercel.app",
+  "http://localhost:5174",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      console.log("Origin:", origin)
+      console.log("Origin:", origin);
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -50,10 +52,9 @@ app.use(
 
 app.options(/.*/, cors());
 
-
 // MongoDB connection
 const connectDB = require("./db/connection.js");
-connectDB()
+connectDB();
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
@@ -121,10 +122,10 @@ app.post("/api/login", async (req, res) => {
 
     // 5. Cookie set karo
     res.cookie("authToken", token, {
-      httpOnly: true,      // frontend se JS access nahi
-      secure: true,        // sirf HTTPS (Vercel ke liye required)
-      sameSite: "None",    // 👈 cross-site allowed
-      path: "/",           // har route pe cookie send hogi
+      httpOnly: true, // frontend se JS access nahi
+      secure: true, // sirf HTTPS (Vercel ke liye required)
+      sameSite: "None", // 👈 cross-site allowed
+      path: "/", // har route pe cookie send hogi
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 din
     });
 
@@ -136,8 +137,6 @@ app.post("/api/login", async (req, res) => {
         email: user.email,
         username: user.username,
         profileImg: user.profileImg,
-        
-
       },
     });
   } catch (error) {
@@ -239,7 +238,9 @@ app.post("/api/customer/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ message: "Please enter all required fields" });
+      return res
+        .status(400)
+        .json({ message: "Please enter all required fields" });
     }
 
     const user = await Customer.findOne({ email });
@@ -257,45 +258,47 @@ app.post("/api/customer/login", async (req, res) => {
       email: user.email,
     };
 
-    const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
+    const JWT_SECRET_KEY =
+      process.env.JWT_SECRET_KEY || "THIS_IS_JWT_SECRET_KEY";
 
-    jwt.sign(payload, JWT_SECRET_KEY, { expiresIn: 84600 }, async (err, token) => {
-      if (err) {
-        return res.status(500).json({ message: "Token generation failed" });
+    jwt.sign(
+      payload,
+      JWT_SECRET_KEY,
+      { expiresIn: 84600 },
+      async (err, token) => {
+        if (err) {
+          return res.status(500).json({ message: "Token generation failed" });
+        }
+
+        await Customer.updateOne({ _id: user.id }, { $set: { token } });
+
+        // Set cookie
+        res.cookie("authToken", token, {
+          httpOnly: true,
+          secure: true, // only in production
+          sameSite: "None",
+          maxAge: 24 * 60 * 60 * 1000, // 1 day
+        });
+
+        return res.status(200).json({
+          message: "Login successful",
+          user: {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            address: user.address,
+            phone: user.phone,
+            cartCount: user.cartItems ? user.cartItems.length : 0,
+          },
+          token,
+        });
       }
-
-      await Customer.updateOne(
-        { _id: user.id },
-        { $set: { token } }
-      );
-
-      // Set cookie
-      res.cookie("authToken", token, {
-        httpOnly: true,
-        secure: true, // only in production
-        sameSite: "None",
-        maxAge: 24 * 60 * 60 * 1000, // 1 day
-      });
-
-      return res.status(200).json({
-        message: "Login successful",
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          address: user.address,
-          phone: user.phone,
-         cartCount: user.cartItems ? user.cartItems.length : 0,
-        },
-        token,
-      });
-    });
+    );
   } catch (error) {
     console.error("Error", error);
     return res.status(500).json({ message: "Server error" });
   }
 });
-
 
 // Example: /api/check-auth
 app.get("/api/check-auth", (req, res) => {
@@ -325,7 +328,6 @@ app.get("/api/logout", (req, res) => {
   });
   return res.status(200).json({ message: "Logged out successfully" });
 });
-
 
 //create products
 app.post("/api/create", upload.array("images", 4), async (req, res) => {
@@ -413,7 +415,7 @@ app.get("/api/products/:id", async (req, res) => {
     console.error("Error fetching product:", error.message);
     res.status(500).json({ message: "Failed to fetch product" });
   }
-})
+});
 //Update products
 app.post("/api/update-products", async (req, res) => {
   try {
@@ -488,7 +490,8 @@ app.delete("/api/products/:id", async (req, res) => {
 });
 
 app.post("/api/cart/add", async (req, res) => {
-  const { userId, productId, quantity, selectedColor, selectedSize, price } = req.body;
+  const { userId, productId, quantity, selectedColor, selectedSize, price } =
+    req.body;
 
   if (!userId || !productId || !quantity) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -521,18 +524,23 @@ app.post("/api/cart/add", async (req, res) => {
     }
 
     await user.save();
-    return res.json({ message: "Item added to cart", cartItems: user.cartItems ,cartCount: user.cartItems.length});
+    return res.json({
+      message: "Item added to cart",
+      cartItems: user.cartItems,
+      cartCount: user.cartItems.length,
+    });
   } catch (error) {
     console.error("Add to cart error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 });
-// Get User Cart
 // get user cart
 app.get("/api/cart/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await Customer.findById(userId).populate("cartItems.productId"); 
+    const user = await Customer.findById(userId).populate(
+      "cartItems.productId"
+    );
     // 👆 productId populate karenge taki product details bhi mil jaye
 
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -544,7 +552,7 @@ app.get("/api/cart/:userId", async (req, res) => {
   }
 });
 app.post("/api/cart/update/:userId", async (req, res) => {
- try {
+  try {
     const { userId } = req.params;
     const { items } = req.body; // [{id, quantity, selectedColor, selectedSize, price}]
 
@@ -569,7 +577,7 @@ app.post("/api/cart/update/:userId", async (req, res) => {
     console.error("Update cart error:", error);
     return res.status(500).json({ message: "Server error" });
   }
-})
+});
 app.post("/api/cart/delete/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -583,18 +591,22 @@ app.post("/api/cart/delete/:userId", async (req, res) => {
     );
 
     await user.save();
-    return res.json({ message: "Unselected items deleted", cartItems: user.cartItems , cartCount: user.cartItems.length});
+    return res.json({
+      message: "Unselected items deleted",
+      cartItems: user.cartItems,
+      cartCount: user.cartItems.length,
+    });
   } catch (error) {
     console.error("Delete cart error:", error);
     return res.status(500).json({ message: "Server error" });
   }
-})
+});
 //post customer Orders✅
 app.post("/api/orders/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const { products, OPostCode, OAddress, OTehsil } = req.body;
-
+    console.log("Order request body:", req.body);
     if (!userId || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "Invalid order data" });
     }
@@ -610,6 +622,7 @@ app.post("/api/orders/:userId", async (req, res) => {
 
     // Fetch product documents from DB
     const productIds = products.map((item) => item.product);
+    console.log("Product IDs in order:", productIds);
     const productDocs = await Product.find({ _id: { $in: productIds } });
 
     if (productDocs.length !== productIds.length) {
@@ -658,7 +671,17 @@ app.post("/api/orders/:userId", async (req, res) => {
     const populatedOrder = await Order.findById(newOrder._id)
       .populate("products.product")
       .populate("user");
-
+    await Customer.findByIdAndUpdate(
+      userId,
+      {
+        $pull: {
+          cartItems: {
+            productId: { $in: productIds },
+          },
+        },
+      },
+      { new: true }
+    );
     res.status(201).json({
       message: "Order created successfully",
       order: populatedOrder,
@@ -724,21 +747,23 @@ app.get("/api/most-selling-products", async (req, res) => {
     // 1. Latest target fetch karo
     const latestTarget = await Target.findOne().sort({ createdAt: -1 });
     if (!latestTarget) {
-      return res.status(404).json({ success: false, message: "No targets found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "No targets found" });
     }
 
     // 2. Aggregate only that target
     const topProducts = await Earning.aggregate([
       {
-        $match: { targetId: latestTarget._id } // filter same target
+        $match: { targetId: latestTarget._id }, // filter same target
       },
       {
         $lookup: {
           from: "products",
           localField: "productId", // ⚠️ earning schema me direct productId ho to use karo
           foreignField: "_id",
-          as: "product"
-        }
+          as: "product",
+        },
       },
       { $unwind: "$product" },
       {
@@ -746,39 +771,43 @@ app.get("/api/most-selling-products", async (req, res) => {
           _id: "$product._id",
           productName: { $first: "$product.productName" },
           totalEarning: { $sum: "$amount" },
-          image: { $first: { $arrayElemAt: ["$product.images.url", 0] } }
-        }
+          image: { $first: { $arrayElemAt: ["$product.images.url", 0] } },
+        },
       },
       { $sort: { totalEarning: -1 } },
-      { $limit: 6 }
+      { $limit: 6 },
     ]);
 
     return res.json({
       success: true,
       target: latestTarget._id,
-      topProducts
+      topProducts,
     });
   } catch (error) {
     console.error("Most selling recent target error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
-})
+});
 // All orders of all users✅
 app.get("/api/orders", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    console.log("Fetching all orders with pagination:", {
-      page,
-      limit,
-      skip,
-    });
-    // Total orders count
-    const totalOrders = await Order.countDocuments();
 
-    // Orders fetch karna with pagination
-    const orders = await Order.find()
+    let { status } = req.query;
+    const filter = {};
+
+    // 🧠 Handle filter (case-insensitive)
+    if (status && status.toLowerCase() !== "all") {
+      filter.status = { $regex: new RegExp(`^${status}$`, "i") };
+    }
+
+    console.log("📦 Fetching orders with:", { page, limit, skip, filter });
+
+    const totalOrders = await Order.countDocuments(filter);
+
+    const orders = await Order.find(filter)
       .select("user products totalAmount status createdAt")
       .populate({
         path: "user",
@@ -793,7 +822,16 @@ app.get("/api/orders", async (req, res) => {
       .limit(limit)
       .lean();
 
-    // Format orders for cleaner response
+    if (!orders.length) {
+      return res.status(200).json({
+        totalOrders: 0,
+        totalPages: 0,
+        currentPage: page,
+        orders: [],
+        message: "No orders found",
+      });
+    }
+
     const formattedOrders = orders.map((order) => ({
       _id: order._id,
       user: order.user
@@ -807,27 +845,31 @@ app.get("/api/orders", async (req, res) => {
       totalAmount: order.totalAmount,
       createdAt: order.createdAt,
       products: order.products.map((item) => ({
-        productId: item.product._id,
-        productName: item.product.productName,
-        price: item.product.price,
-        images: item.product.images[0]?.url || "", // Assuming images is an array and we want the first image URL
+        productId: item.product?._id,
+        productName: item.product?.productName || "N/A",
+        price: item.product?.price || 0,
+        images: item.product?.images?.[0]?.url || "",
         quantity: item.quantity,
+        selectedColor: item.selectedColor,
+        selectedSize: item.selectedSize,
       })),
     }));
-    // console.log(JSON.stringify(formattedOrders, null, 2));
-    // console.log("Total orders fetched:", formattedOrders);
+
     res.status(200).json({
-      totalOrders, // total count of orders
-      totalPages: Math.ceil(totalOrders / limit), // total pages
-      page,
+      totalOrders,
+      totalPages: Math.ceil(totalOrders / limit),
+      currentPage: page,
       limit,
       orders: formattedOrders,
     });
   } catch (error) {
-    console.error("Error fetching all orders:", error);
+    console.error("❌ Error fetching orders:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
+
 
 app.post("/api/update-status/:orderId", async (req, res) => {
   const { orderId } = req.params;
@@ -899,7 +941,7 @@ app.get("/api/get-total-documents", async (req, res) => {
   }
 });
 
-app.post("/api/set-target",async (req, res) => {
+app.post("/api/set-target", async (req, res) => {
   const { amount, endDate, startDate } = req.body;
   try {
     // Validate required fields
@@ -923,28 +965,61 @@ app.post("/api/set-target",async (req, res) => {
   }
 });
 
-app.post("/api/deliverd/:userId", async (req, res) => {
-  const { userId } = req.params;
-  const { amount, targetId } = req.body;
-  if (!amount || !targetId) {
-    return res
-      .status(400)
-      .json({ message: "Amount and TargetId are required." });
-  }
+app.post("/api/update-status/:orderId/:userId", async (req, res) => {
+  const { orderId, userId } = req.params;
+  const { status, amount } = req.body;
+
+  if (!orderId) return res.status(400).json({ message: "Order ID is required." });
+  if (!status) return res.status(400).json({ message: "Status is required." });
+
   try {
-    const earning = new Earning({
-      targetId,
-      userId,
-      amount,
+    // 🧠 Step 1: Update the order status
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedOrder) return res.status(404).json({ message: "Order not found." });
+
+    // ✅ Step 2: If status is "delivered", create earning automatically
+    if (status.toLowerCase() === "delivered") {
+      // Find active target
+      const activeTarget = await Target.findOne({ status: "active" });
+
+      if (!activeTarget) {
+        return res.status(404).json({
+          message: "No active target found for earning creation.",
+        });
+      }
+
+      // Create earning record using found targetId
+      const earning = new Earning({
+        targetId: activeTarget._id,
+        userId,
+        amount,
+      });
+
+      await earning.save();
+      console.log("Earning created successfully:", earning);
+    }
+
+    return res.status(200).json({
+      message:
+        status.toLowerCase() === "delivered"
+          ? "Order delivered & earning recorded successfully."
+          : "Order status updated successfully.",
+      order: updatedOrder,
     });
-    await earning.save();
-    res.status(201).json({ success: true, earning });
   } catch (error) {
-    console.log("Error message", error);
+    console.error("Error updating order status:", error);
+    return res.status(500).json({ message: "Internal server error." });
   }
 });
 
-app.get("/api/target", checkAndExpireTargets ,async (req, res) => {
+
+
+app.get("/api/target", checkAndExpireTargets, async (req, res) => {
   try {
     // 1) pehle all earnings ka total nikaal lo (hamesha chahiye)
     const allEarnings = await Earning.find({});
@@ -995,7 +1070,6 @@ app.get("/api/reports", async (req, res) => {
 });
 
 // This runs every hour (adjust interval as needed)
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
