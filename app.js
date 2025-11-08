@@ -682,7 +682,11 @@ app.post("/api/orders/:userId", async (req, res) => {
       },
       { new: true }
     );
+    const user = await Customer.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.status(201).json({
+      cartItems: user.cartItems,
+      cartCount: user.cartItems.length,
       message: "Order created successfully",
       order: populatedOrder,
     });
@@ -868,9 +872,6 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-
-
-
 app.post("/api/update-status/:orderId", async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
@@ -997,6 +998,7 @@ app.post("/api/update-status/:orderId/:userId", async (req, res) => {
       const earning = new Earning({
         targetId: activeTarget._id,
         userId,
+        orderId,
         amount,
       });
 
@@ -1016,9 +1018,6 @@ app.post("/api/update-status/:orderId/:userId", async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 });
-
-
-
 app.get("/api/target", checkAndExpireTargets, async (req, res) => {
   try {
     // 1) pehle all earnings ka total nikaal lo (hamesha chahiye)
@@ -1068,9 +1067,7 @@ app.get("/api/reports", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 // This runs every hour (adjust interval as needed)
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
